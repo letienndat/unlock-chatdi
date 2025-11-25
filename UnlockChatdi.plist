@@ -1,1 +1,1 @@
-{ Filter = { Bundles = ( "com.aichatbot.assistant" ); }; }
+{ Filter = { Bundles = ( "chatdi.aichatbot.assistant" ); }; }
