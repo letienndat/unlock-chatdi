@@ -1,5 +1,4 @@
 @import UIKit;
+@import Foundation;
 
-@interface RCTAppDelegate
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)options;
-@end
+typedef void (^RCTResponseSenderBlock)(NSArray *response);

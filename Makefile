@@ -8,7 +8,7 @@ TWEAK_NAME = UnlockChatdi
 
 UnlockChatdi_FILES = \
 			Tweak.xm \
-			Hooks/NSURLSessionHooks.xm
+			Hooks/RNCAsyncStorageHooks.xm
 
 UnlockChatdi_CFLAGS = -fobjc-arc
 
