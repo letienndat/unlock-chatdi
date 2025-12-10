@@ -12,5 +12,7 @@ UnlockChatdi_FILES = \
 			Hooks/FFFastImageViewHooks.xm
 
 UnlockChatdi_CFLAGS = -fobjc-arc
+UnlockChatdi_CFLAGS += -F./layout/Library/Frameworks
+UnlockChatdi_LDFLAGS += -F./layout/Library/Frameworks -framework MobileVLCKit
 
 include $(THEOS_MAKE_PATH)/tweak.mk

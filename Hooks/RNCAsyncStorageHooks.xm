@@ -1,4 +1,5 @@
 #import "Headers/ChatdiClasses.h"
+#import <MobileVLCKit/MobileVLCKit.h>
 
 NSString *kTokenStore = @"token-store";
 NSString *vTokenStore = @"{\"state\":{\"tokenBalance\":999999,\"totalToken\":999999,\"expireTime\":4070908800000,\"lastPurchase\":1735689600000},\"version\":0}";

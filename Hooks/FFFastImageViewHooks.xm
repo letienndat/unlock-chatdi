@@ -1,73 +1,123 @@
 #import "Headers/ChatdiClasses.h"
+#import <objc/runtime.h>
 
 #define TAG_WEB_VIEW_WEBM 999
 
+static void *kChatdiVLCPlayerKey = &kChatdiVLCPlayerKey;
+
+@interface FFFastImageView (ChatdiVLC)
+@property (nonatomic, strong) VLCMediaPlayer *chatdiPlayer;
+
+- (void)safeStopPlayer;
+@end
+
 %hook FFFastImageView
 
-- (void)setSource:(FFFastImageSource *)arg {
-    if (arg && arg.url) {
-        NSString *ext = arg.url.pathExtension;
-        if ([ext isEqualToString:@"webm"]) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if ([self viewWithTag:TAG_WEB_VIEW_WEBM]) {
-                    return;
-                }
+%new
+- (VLCMediaPlayer *)chatdiPlayer {
+    return objc_getAssociatedObject(self, kChatdiVLCPlayerKey);
+}
 
-                WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
-                config.allowsInlineMediaPlayback = YES;
-                config.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
-                
-                WKWebView *webView = [[WKWebView alloc] initWithFrame:self.bounds configuration:config];
-                webView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-                webView.tag = TAG_WEB_VIEW_WEBM;
+%new
+- (void)setChatdiPlayer:(VLCMediaPlayer *)player {
+    objc_setAssociatedObject(self, kChatdiVLCPlayerKey, player, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
 
-                if (@available(iOS 16.4, *)) {
-                    webView.inspectable = YES;
-                }
-                
-                webView.userInteractionEnabled = NO; 
-                webView.opaque = NO;
-                webView.backgroundColor = [UIColor clearColor];
-                webView.scrollView.scrollEnabled = NO;
-
-                NSString *html = [NSString stringWithFormat:
-                    @"<!DOCTYPE html>"
-                    @"<html>"
-                    @"<head>"
-                    @"<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>"
-                    @"<style>"
-                    @"html, body { margin: 0; padding: 0; width: 100vw; height: 100vh; background: transparent; overflow: hidden; }"
-                    @"body { display: flex; justify-content: center; align-items: center; }"
-                    @"video { "
-                    @"  width: 100%%; "
-                    @"  height: 100%%; "
-                    @"  object-fit: cover; "
-                    @"  pointer-events: none; "
-                    @"}"
-                    @"</style>"
-                    @"</head>"
-                    @"<body>"
-                    @"<video src='%@' autoplay loop muted playsinline webkit-playsinline></video>"
-                    @"</body>"
-                    @"</html>", arg.url.absoluteString];
-
-                [webView loadHTMLString:html baseURL:nil];
-                [self addSubview:webView];
-            });
-
-            return;
+%new
+- (void)safeStopPlayer {
+    id p = [self chatdiPlayer];
+    
+    if (p && [p isKindOfClass:objc_getClass("VLCMediaPlayer")]) {
+        VLCMediaPlayer *vlcPlayer = (VLCMediaPlayer *)p;
+        
+        if ([vlcPlayer isPlaying] || [vlcPlayer willPlay]) {
+            [vlcPlayer stop];
         }
+        
+        vlcPlayer.delegate = nil;
+        vlcPlayer.drawable = nil;
+        vlcPlayer.media = nil;
+    }
+    
+    [self setChatdiPlayer:nil];
+}
+
+- (void)setSource:(FFFastImageSource *)arg {
+    NSString *ext = arg.url.pathExtension.lowercaseString;
+    BOOL isWebM = [ext isEqualToString:@"webm"];
+
+    if (isWebM) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if ([self viewWithTag:TAG_WEB_VIEW_WEBM]) return;
+
+            [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:nil];
+            [[AVAudioSession sharedInstance] setActive:YES error:nil];
+
+            UIView *videoView = [[UIView alloc] initWithFrame:self.bounds];
+            videoView.tag = TAG_WEB_VIEW_WEBM;
+            videoView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+            videoView.backgroundColor = [UIColor clearColor];
+            [self addSubview:videoView];
+
+            VLCMediaPlayer *player = [[VLCMediaPlayer alloc] init];
+            
+            player.drawable = videoView;
+            VLCMedia *media = [VLCMedia mediaWithURL:arg.url];
+            [media addOptions:@{ 
+                @"input-repeat": @(65535),
+                @"network-caching": @300
+            }];
+            player.media = media;
+            [player play];
+
+            [self setChatdiPlayer:player];
+        });
+        return;
     }
 
     dispatch_async(dispatch_get_main_queue(), ^{
-        for (UIView *v in self.subviews) {
-            if (v.tag == TAG_WEB_VIEW_WEBM) {
-                [v removeFromSuperview];
-            }
-        }
+        [self safeStopPlayer];
+        [[self viewWithTag:TAG_WEB_VIEW_WEBM] removeFromSuperview];
     });
 
     %orig(arg);
+}
+
+%new
+- (void)pausePlaying {
+    [self safeStopPlayer];
+}
+
+%new
+- (void)stopLoading {
+    [self safeStopPlayer];
+}
+
+- (void)didMoveToWindow {
+    %orig;
+
+    id p = [self chatdiPlayer];
+    if (p && [p isKindOfClass:objc_getClass("VLCMediaPlayer")]) {
+        VLCMediaPlayer *player = (VLCMediaPlayer *)p;
+        
+        if (self.window) {
+            if (![player isPlaying]) {
+                [player play];
+            }
+        } else {
+            [player pause];
+        }
+    }
+}
+
+- (void)prepareForReuse {
+    [self safeStopPlayer];
+    %orig;
+}
+
+- (void)dealloc {
+    [self safeStopPlayer];
+    %orig;
 }
 
 %end
