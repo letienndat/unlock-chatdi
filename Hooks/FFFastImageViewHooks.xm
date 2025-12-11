@@ -5,7 +5,7 @@
 
 static void *kChatdiVLCPlayerKey = &kChatdiVLCPlayerKey;
 
-@interface FFFastImageView (ChatdiVLC)
+@interface FFFastImageView ()
 @property (nonatomic, strong) VLCMediaPlayer *chatdiPlayer;
 
 - (void)safeStopPlayer;
@@ -62,6 +62,7 @@ static void *kChatdiVLCPlayerKey = &kChatdiVLCPlayerKey;
             VLCMediaPlayer *player = [[VLCMediaPlayer alloc] init];
             
             player.drawable = videoView;
+            player.audio.muted = YES;
             VLCMedia *media = [VLCMedia mediaWithURL:arg.url];
             [media addOptions:@{ 
                 @"input-repeat": @(65535),
